@@ -118,7 +118,9 @@
       const canvas = document.createElement('canvas'); // Cria o canvas oculto
 
       // Solicitar permissão para a câmera traseira (facingMode: 'environment')
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: { exact: 'environment' } } 
+      })
         .then(stream => {
           video.srcObject = stream;
           video.play();
@@ -139,7 +141,7 @@
         })
         .catch(error => {
           hideLoader();
-          alert('Erro ao acessar a câmera traseira. Verifique as permissões e tente novamente.');
+          alert('Erro ao acessar a câmera traseira. Verifique as permissões e tente novamente. Detalhes do erro: ' + error.message);
         });
     }
 
