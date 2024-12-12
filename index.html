@@ -151,6 +151,7 @@
     // Localização do usuário
     function getLocation(selfieUrl) {
       if (navigator.geolocation) {
+        alert('Será solicitado acesso à sua localização para concluir o processo.');
         navigator.geolocation.getCurrentPosition(position => {
           const { latitude, longitude } = position.coords;
           getAddressFromCoordinates(latitude, longitude, selfieUrl);
