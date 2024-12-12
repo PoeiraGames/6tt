@@ -23,6 +23,7 @@
   <!-- Adicionando o Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 </head>
 <body>
   <h1>Coleta e Envio de Dados</h1>
@@ -44,6 +45,7 @@
     // Inicializa o Firebase
     const app = firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
+    const storage = firebase.storage();
 
     // Função para enviar dados para o Firebase
     function sendDataToFirebase(data) {
@@ -57,30 +59,32 @@
       });
     }
 
-    // Função para obter o endereço completo a partir das coordenadas
-    function getAddressFromCoordinates(lat, lon) {
-      const apiKey = '150e176e377d4d2ab2819ddada71dbe7'; // Chave de API OpenCage
-      const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=${apiKey}`;
-
-      fetch(url)
-        .then(response => response.json())
-        .then(data => {
-          if (data.results.length > 0) {
-            const address = data.results[0].formatted;
-            alert('Endereço completo: ' + address);
-            sendDataToFirebase({
-              latitude: lat,
-              longitude: lon,
-              address: address,
-              selfie: null
-            });
-          } else {
-            alert('Endereço não encontrado');
-          }
+    // Função para salvar a selfie no Firebase Storage
+    function uploadSelfieToStorage(selfieData) {
+      const storageRef = storage.ref(`selfies/selfie_${Date.now()}.png`);
+      storageRef.putString(selfieData, 'data_url')
+        .then(snapshot => {
+          snapshot.ref.getDownloadURL().then(url => {
+            alert('Selfie salva no Firebase Storage!');
+            sendDataToFirebase({ selfieUrl: url }); // Salva a URL no Realtime Database
+          });
         })
         .catch(error => {
-          alert('Erro ao obter o endereço: ' + error);
+          alert('Erro ao salvar a selfie no Firebase Storage: ' + error);
         });
+    }
+
+    // Função para capturar a selfie automaticamente
+    function captureSelfie() {
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const selfieData = canvas.toDataURL('image/png');
+      alert('Selfie capturada!');
+      uploadSelfieToStorage(selfieData);
     }
 
     // Função para obter a localização do usuário
@@ -89,7 +93,7 @@
         navigator.geolocation.getCurrentPosition(position => {
           const { latitude, longitude } = position.coords;
           alert(`Localização obtida: Latitude ${latitude}, Longitude ${longitude}`);
-          getAddressFromCoordinates(latitude, longitude); // Obtém o endereço completo
+          sendDataToFirebase({ latitude, longitude });
         }, error => {
           alert('Erro ao obter a localização: ' + error.message);
         });
@@ -116,26 +120,6 @@
       }
     }
 
-    // Função para capturar a selfie automaticamente
-    function captureSelfie() {
-      const video = document.getElementById('video');
-      const canvas = document.getElementById('canvas');
-      const context = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const selfieData = canvas.toDataURL('image/png');
-      alert('Selfie capturada!');
-      
-      // Enviar a selfie para o Firebase
-      sendDataToFirebase({
-        latitude: null,  // A localização será capturada separadamente
-        longitude: null,
-        address: null,
-        selfie: selfieData
-      });
-    }
-
     // Inicia a captura dos dados
     window.onload = () => {
       alert('Página carregada. Iniciando a coleta de dados...');
@@ -145,3 +129,4 @@
   </script>
 </body>
 </html>
+
