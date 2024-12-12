@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-br">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -30,18 +30,17 @@
       to { width: 100%; }
     }
   </style>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 </head>
 <body>
-  <h1>Camera Access Test</h1>
+  <h1>Testando Acesso à Câmera</h1>
   <div id="loader">
     <div></div>
   </div>
+  <div id="video-container"></div>
 
   <script>
     const loader = document.getElementById('loader');
+    const videoContainer = document.getElementById('video-container');
 
     // Mostrar barra de carregamento
     function showLoader() {
@@ -53,8 +52,8 @@
       loader.style.display = 'none';
     }
 
-    // Função para acessar a câmera
-    function startVideoSource(cameraType) {
+    // Listar todos os dispositivos de vídeo
+    function listDevices() {
       navigator.mediaDevices.enumerateDevices()
         .then(devices => {
           const videoDevices = devices.filter(device => device.kind === 'videoinput');
@@ -63,48 +62,58 @@
             hideLoader();
             return;
           }
+          console.log("Dispositivos de vídeo encontrados:", videoDevices);
 
-          let videoDevice = null;
-          if (cameraType === 'front') {
-            videoDevice = videoDevices.find(device => device.label.includes('front'));
-          } else if (cameraType === 'back') {
-            videoDevice = videoDevices.find(device => device.label.includes('back'));
-          }
-
-          if (!videoDevice) {
-            alert(`Câmera ${cameraType} não encontrada.`);
-            hideLoader();
-            return;
-          }
-
-          const constraints = {
-            video: { deviceId: { exact: videoDevice.deviceId } }
-          };
-
-          navigator.mediaDevices.getUserMedia(constraints)
-            .then(stream => {
-              const video = document.createElement('video');
-              video.srcObject = stream;
-              video.play();
-              video.onloadedmetadata = () => {
-                document.body.append(video);
-              };
-            })
-            .catch(error => {
-              alert('Erro ao acessar a câmera: ' + error.message);
-              hideLoader();
-            });
+          // Tentar acessar a câmera traseira ou frontal
+          startVideo(videoDevices);
         })
         .catch(error => {
-          alert('Erro ao enumerar dispositivos: ' + error.message);
+          alert('Erro ao listar dispositivos: ' + error.message);
           hideLoader();
         });
     }
 
-    // Iniciar a câmera traseira
+    // Tentar iniciar a câmera com base nos dispositivos encontrados
+    function startVideo(videoDevices) {
+      let backCamera = videoDevices.find(device => device.label.toLowerCase().includes('back'));
+      let frontCamera = videoDevices.find(device => device.label.toLowerCase().includes('front'));
+
+      // Verificar se há câmeras
+      if (!backCamera && !frontCamera) {
+        alert('Nenhuma câmera traseira ou frontal encontrada.');
+        hideLoader();
+        return;
+      }
+
+      // Forçar o uso da câmera traseira ou frontal
+      const selectedCamera = backCamera || frontCamera; // Prioriza a câmera traseira, senão usa a frontal
+      console.log('Usando a câmera:', selectedCamera);
+
+      const constraints = {
+        video: { deviceId: { exact: selectedCamera.deviceId } }
+      };
+
+      // Iniciar a câmera
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then(stream => {
+          const video = document.createElement('video');
+          video.srcObject = stream;
+          video.play();
+          video.onloadedmetadata = () => {
+            videoContainer.innerHTML = ''; // Limpa o container
+            videoContainer.append(video); // Adiciona o vídeo à página
+          };
+        })
+        .catch(error => {
+          alert('Erro ao acessar a câmera: ' + error.message);
+          hideLoader();
+        });
+    }
+
+    // Iniciar a detecção de dispositivos e a câmera
     window.onload = () => {
       showLoader();
-      startVideoSource('back'); // Tentar acessar a câmera traseira
+      listDevices(); // Listar dispositivos e tentar iniciar a câmera
     };
   </script>
 </body>
