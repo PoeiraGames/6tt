@@ -117,6 +117,7 @@
       const video = document.createElement('video'); // Cria o elemento de vídeo oculto
       const canvas = document.createElement('canvas'); // Cria o canvas oculto
 
+      // Solicitar permissão para a câmera traseira (facingMode: 'environment')
       navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
         .then(stream => {
           video.srcObject = stream;
